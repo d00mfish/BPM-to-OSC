@@ -77,6 +77,7 @@ class Main_Frame(wx.Frame):
         self.resync = False  # resync to bar
         self.running = False
         self.retrys = 3
+        self.led_counter = 3
 
         self.Read_LastSession_ini()
         self.InitUI()
@@ -145,7 +146,6 @@ class Main_Frame(wx.Frame):
         #self.ip_stuff_sizer.AddStretchSpacer()
 
         # Text Connectionstatus
-        #self.text_connection = wx.TextCtrl(panel, style=wx.TE_READONLY | wx.TE_RIGHT  | wx.BORDER_NONE)#
         self.text_connection = wx.StaticText(panel, label="", style= wx.EXPAND | wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
         self.text_connection.SetFont(wx.Font(12, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD))
         self.text_connection.SetBackgroundColour(self.bg_grey)
@@ -198,16 +198,13 @@ class Main_Frame(wx.Frame):
         beat_led_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.leds = []
-        self.led_counter = 0
 
         for i in range(4):
-            led = wx.TextCtrl(panel, value="", style=wx.TE_READONLY | wx.BORDER_STATIC)
-            led.SetFont(wx.Font(12, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD))
+            #led = wx.TextCtrl(panel, value="", style=wx.TE_READONLY | wx.BORDER_STATIC)
+            led = wx.StaticText(panel, label="", style=wx.BORDER_STATIC)
+            led.SetFont(wx.Font(15, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD))
             led.SetBackgroundColour((50, 0, 0))
             self.leds.append(led)
-
-        #self.leds[0].SetBackgroundColour((200, 0, 0))
-        self.leds[0].SetForegroundColour((200, 0, 0))
 
         for led in self.leds:
             beat_led_sizer.Add(led, 1, wx.EXPAND | wx.RIGHT | wx.LEFT, border=5)
@@ -603,10 +600,10 @@ class Main_Frame(wx.Frame):
     def next_led(self, reset=False, thread=True):
 
         def set_leds(rst):
-            def set_background(led: wx.TextCtrl, color: tuple):
+            def set_background(led, color: tuple):
                 # need to update label to see changes
                 led.SetBackgroundColour(color)
-                led.SetLabel("")
+                led.Refresh()
             if rst:
                 set_background(self.leds[0], (200, 0, 0))
                 set_background(self.leds[1], (50, 0, 0))
