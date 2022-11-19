@@ -3,4 +3,4 @@ Detecting the BPM from an audio input and sending (custom) OSC commands to set t
 
 
 
-![Screenshot 2022-11-16 142829](https://user-images.githubusercontent.com/8715042/202862010-cc1e1e92-05d3-409c-8a70-8defa9a2fc14.png)
+![Screenshot 2022-11-16 142829](https://user-images.githubusercontent.com/8715042/202862147-c148c14b-795e-4572-83f5-f9e4242480e8.png)
