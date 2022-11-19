@@ -1,4 +1,4 @@
-"""#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.9.13 64-Bit
 # WxPython: v4.1.1
@@ -9,7 +9,7 @@
 #
 # TODO:
 # - Other output (Midi clock?)
-# - Darkmode?"""
+# - Darkmode?
 
 # Imports:
 from os import remove, system
@@ -173,7 +173,7 @@ class Main_Frame(wx.Frame):
 
 # PEAK METER
         self.peak_meter = PM.PeakMeterCtrl(panel, -1, style=wx.SIMPLE_BORDER, agwStyle=PM.PM_HORIZONTAL)
-        self.peak_meter.SetMeterBands(1, 42)
+        self.peak_meter.SetMeterBands(1, 48)
         self.peak_meter.SetFalloffEffect(False)
         self.peak_meter.SetBandsColour((150, 220, 150), (255, 255, 150), (220, 150, 150))
         self.peak_meter.SetRangeValue(20, 60, 80)
