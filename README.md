@@ -4,4 +4,4 @@ Detecting the BPM from an audio input and sending (custom) OSC commands to set t
 If you wnat to change the osc commands that are sent or any problems occur, edit or delete the
 `C:\Users\[USER]\AppData\Roaming\BPMtoOSC\lastsession.ini` file.
 
-![Screenshot 2022-11-16 142829](https://user-images.githubusercontent.com/8715042/202862147-c148c14b-795e-4572-83f5-f9e4242480e8.png)
+![BPM-to-OSC-2022-11-30-12-20-45-Trim](https://user-images.githubusercontent.com/8715042/204784228-d0d6669f-5fe1-4689-aa9a-840369e1eebe.gif)
