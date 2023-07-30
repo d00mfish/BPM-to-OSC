@@ -1,5 +1,4 @@
 from pythonosc.udp_client import SimpleUDPClient
-from scipy.interpolate import interp1d
 
 
 class OSCclient():
@@ -9,7 +8,7 @@ class OSCclient():
         self.__port = port
 
         self.__osc_client = SimpleUDPClient(self.ip, self.port)
-        self.__map = interp1d([20, 500], [0, 1])
+        #self.__map = interp1d([20, 500], [0, 1])
 
     @property
     def ip(self):
@@ -40,7 +39,7 @@ class OSCclient():
     def send_osc(self, osc_address: str, value, map_to_resolume=False) -> None:
         if map_to_resolume:
             if value > 20 and value < 500:
-                self.__osc_client.send_message(osc_address, float(self.__map(value)))
+                self.__osc_client.send_message(osc_address, float(value - 20) / float(480))
         else:
             self.__osc_client.send_message(osc_address, value)
 

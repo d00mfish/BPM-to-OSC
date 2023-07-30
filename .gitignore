@@ -1,2 +1,6 @@
 __pycache__/*
-audio-player.ico
+BPMtoOSC.ico
+pytoexe config.json
+installation tips.txt
+lastsession.ini
+output/BPMtoOSC.exe

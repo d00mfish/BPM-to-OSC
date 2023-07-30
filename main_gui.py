@@ -16,15 +16,17 @@ from os import remove, system
 from pathlib import Path
 from subprocess import call
 from platform import system
-import time
+from time import time
+from threading import Thread, Event
 
+# local
 from sevensegment import SevenSegmentDisp
 import beatfinder
 import osc_client
 
 import configparser
 import pyaudio
-import threading
+
 
 import wx
 import wx.lib.masked.ipaddrctrl as ipctrl
@@ -37,6 +39,7 @@ class Main_Frame(wx.Frame):
     sel_msg_frame = None
     sel_bus_frame = None
     CONF_PATH = Path(Path.home(), "AppData/Roaming/BPMtoOSC/lastsession.ini")
+    #CONF_PATH = Path("lastsession.ini")
 
     def __init__(self, parent=None):
         """Initialize Config Window
@@ -45,7 +48,7 @@ class Main_Frame(wx.Frame):
         """
         # wx.Frame init
         style_dep = wx.DEFAULT_FRAME_STYLE ^ wx.MAXIMIZE_BOX  # ^ wx.RESIZE_BORDER
-        super(Main_Frame, self).__init__(parent, title="BPM to OSC", style=style_dep)
+        super(Main_Frame, self).__init__(parent, title="BPMtoOSC", style=style_dep)
 
         # Config Setup
         self.config = configparser.ConfigParser()
@@ -63,9 +66,10 @@ class Main_Frame(wx.Frame):
         # BPM Setup
         self.beatfinder = None  # audio analysis instance
         self.send_bpm = 128  # sent bpm when sync is diasabled (used to hold last live or tap value)
-        self.no_sync_send_thread = threading.Thread(target=self.send_thread_when_no_sync)
+        self.beat_divider = 1  # divides beat to get 1/2, 1/4
+        self.no_sync_send_thread = Thread(target=self.send_thread_when_no_sync)
 
-        self.bpm_thread_wait_and_terminate = threading.Event()  # c based event to wait in thread or terminate
+        self.bpm_thread_wait_and_terminate = Event()  # c based event to wait in thread or terminate
         self.bpm_thread_wait_and_terminate.clear()
 
         self.last_tap = list()  # list of taps to determine bpm
@@ -107,8 +111,10 @@ class Main_Frame(wx.Frame):
             # if no config found, create one with default values
             self.config.read(self.CONF_PATH)
             if self.config.sections() == []:
-                self.config['OSC'] = {'IP': '127.000.000.001', 'PORT': 7000, 'RESYNC_BAR_ADRESS':
-                                    '/composition/tempocontroller/resync', 'BPM_ADRESS': '/composition/tempocontroller/tempo'}
+                self.config['OSC'] = {'IP': '127.000.000.001',
+                                      'PORT': 7000,
+                                      'RESYNC_BAR_ADRESS': '/composition/tempocontroller/resync',
+                                      'BPM_ADRESS': '/composition/tempocontroller/tempo'}
                 self.config['AUDIO'] = {'device_index': '1'}
         except:
             if self.retrys > 0:
@@ -123,8 +129,12 @@ class Main_Frame(wx.Frame):
 
         panel = wx.Panel(self)
         sizer = wx.GridBagSizer(14, 4)
-
+        
+        # 7seg background blink
         self.bg_grey = wx.Colour(240, 240, 240)
+        self.bg_a = (self.bg_grey,(220, 220, 220))
+        #self.bg_b = (220, 220, 220), self.bg_grey
+
         buttonfont = wx.Font(20, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD)
 
         # Title Connect to Box
@@ -141,25 +151,37 @@ class Main_Frame(wx.Frame):
         self.text_port.SetMax(65535)
         self.text_port.SetMin(0)
         self.text_port.SetValue(self.config['OSC']['PORT'])
-        self.ip_stuff_sizer.Add(self.text_port, 0, wx.LEFT | wx.ALIGN_CENTER, border=5)
+        self.ip_stuff_sizer.Add(self.text_port, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER, border=5)
         
         #self.ip_stuff_sizer.AddStretchSpacer()
 
+        """# Textbox OSC Adress
+        self.osc_adress_box = wx.TextCtrl(panel, value=self.config['OSC']['BPM_ADRESS'])
+        self.ip_stuff_sizer.Add(self.osc_adress_box, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER, border=5)
+        # self.ip_stuff_sizer.AddStretchSpacer()
+
+        # Send Value Selection
+        self.send_format = wx.Choice(panel, choices=["Resolume BPM", "Actual BPM", "True / False"])
+        print(self.config['OSC']['BPM_SEND_FORMAT'])
+        self.send_format.SetSelection(int(self.config['OSC']['BPM_SEND_FORMAT']))
+        self.ip_stuff_sizer.Add(self.send_format, 0, wx.LEFT | wx.ALIGN_CENTER, border=5)"""
+
         # Text Connectionstatus
-        self.text_connection = wx.StaticText(panel, label="", style= wx.EXPAND | wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
+        self.text_connection = wx.StaticText(panel, label="", style=wx.EXPAND | wx.ALIGN_RIGHT | wx.ALIGN_BOTTOM)
         self.text_connection.SetFont(wx.Font(12, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD))
         self.text_connection.SetBackgroundColour(self.bg_grey)
         # Enter current status after trying to connect with ini information
         self.ip_stuff_sizer.Add(self.text_connection, 2, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER, border=5)
+
+        
 
         # Button Ping
         self.button_ping = wx.Button(panel, wx.ID_ANY, label="Ping")
         self.ip_stuff_sizer.Add(self.button_ping, 0, wx.RIGHT | wx.LEFT | wx.ALIGN_CENTER, border=5)
         self.Bind(wx.EVT_BUTTON, self.on_button_ping, self.button_ping)
         
-        sizer.Add(self.ip_stuff_sizer, pos=(0, 0), span=(2,4),flag=wx.EXPAND | wx.TOP | wx.LEFT |wx.RIGHT, border=10)
+        sizer.Add(self.ip_stuff_sizer, pos=(0, 0), span=(2, 4), flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=10)
         #sizer.Add(self.ip_stuff_sizer, pos=(1, 0), span=(1, 4), flag=wx.EXPAND, border=10)
-        
 
         # Title Open File
         audiosizer = wx.StaticBoxSizer(wx.HORIZONTAL, panel, label="Audio Input Device")
@@ -189,7 +211,7 @@ class Main_Frame(wx.Frame):
         sizer.Add(self.button_reload, pos=(3, 3), flag=wx.TOP | wx.RIGHT, border=10)
         self.Bind(wx.EVT_BUTTON, self.on_button_reload, self.button_reload)"""
 
-#SEPARATOR
+# SEPARATOR
         line1 = wx.StaticLine(panel)
         sizer.Add(line1, pos=(3, 0), span=(1, 4), flag=wx.EXPAND, border=10)
 
@@ -240,19 +262,33 @@ class Main_Frame(wx.Frame):
             bpm_box_sending.Add(digit, 1, wx.EXPAND | wx.DOWN, 5)
 
         sevenseg_sizer.Add(bpm_box_live, 3, wx.EXPAND | wx.LEFT, 10)
+        
 
+# SYNC BUTTON
+        self.sevenseg_button_sizer = wx.BoxSizer(orient=wx.VERTICAL)
         self.button_sync = wx.ToggleButton(panel, label='S\nY\nN\nC')  # \n➜
         self.button_sync.SetForegroundColour((150, 220, 150))
         self.button_sync.SetValue(True)
         #self.button_sync.SetFont(wx.Font(25, family=wx.DEFAULT, style=wx.NORMAL, weight=wx.BOLD))
         self.button_sync.SetFont(buttonfont)
         self.buttons_to_disable.append(self.button_sync)
-        sevenseg_sizer.Add(self.button_sync, 1, wx.EXPAND | wx.UP, 5)
+        #sevenseg_sizer.Add(self.button_sync, 1, wx.EXPAND | wx.UP, 5)
+        self.sevenseg_button_sizer.Add(self.button_sync, 3, wx.EXPAND, 5)
         self.Bind(wx.EVT_TOGGLEBUTTON, self.on_button_sync, self.button_sync)
-
+        
+# Live Halftime Button
+        self.button_halftime = wx.ToggleButton(panel, label='1/2')
+        self.button_halftime.SetFont(buttonfont)
+        self.buttons_to_disable.append(self.button_halftime)
+        self.sevenseg_button_sizer.Add(self.button_halftime, 1, wx.EXPAND, 5)
+        self.Bind(wx.EVT_TOGGLEBUTTON, self.on_button_halftime, self.button_halftime)
+        
+        # add the sevensesg button sizer between the displays
+        sevenseg_sizer.Add(self.sevenseg_button_sizer, 1, wx.EXPAND | wx.UP, 5)
         sevenseg_sizer.Add(bpm_box_sending, 3, wx.EXPAND | wx.RIGHT, 10)
 
         sizer.Add(sevenseg_sizer, pos=(5, 0), span=(3, 4), flag=wx.EXPAND, border=10)
+
 
 # BUTTONS: |  RE-   | +1 | -1 |
 #          | SYNC   | x2 | /2 |
@@ -336,6 +372,7 @@ class Main_Frame(wx.Frame):
         sizer.Fit(self)
 
     def on_button_plus_one(self, event):
+        self.on_button_halftime(None, reset=True)
         self.next_led()
         if self.sync:
             self.switch_sync(False)
@@ -344,6 +381,7 @@ class Main_Frame(wx.Frame):
             self.update_bpm_display(self.send_bpm, send_to="send")
 
     def on_button_minus_one(self, event):
+        self.on_button_halftime(None, reset=True)
         if self.sync:
             self.switch_sync(False)
         if self.send_bpm > 20:
@@ -351,6 +389,7 @@ class Main_Frame(wx.Frame):
             self.update_bpm_display(self.send_bpm, send_to="send")
 
     def on_button_double(self, event):
+        self.on_button_halftime(None, reset=True)
         if self.sync:
             self.switch_sync(False)
         if self.send_bpm*2 <= 500:
@@ -358,11 +397,19 @@ class Main_Frame(wx.Frame):
             self.update_bpm_display(self.send_bpm, send_to="send")
 
     def on_button_half(self, event):
+        self.on_button_halftime(None, reset=True)
         if self.sync:
             self.switch_sync(False)
         if self.send_bpm/2 >= 20:
             self.send_bpm = round(self.send_bpm/2)
             self.update_bpm_display(self.send_bpm, send_to="send")
+
+    def on_button_halftime(self, event, reset=False):
+        if reset:
+            self.button_halftime.SetValue(False)
+        
+        self.beat_divider = 2 if self.button_halftime.GetValue() else 1
+
 
     def on_button_reload(self, event):
         """Reloads the audio devices"""
@@ -401,10 +448,10 @@ class Main_Frame(wx.Frame):
         if len(self.last_tap) > 1:
 
             # add time and timedelta to list
-            self.last_tap.append((time.time(), time.time() - self.last_tap[-1][0]))
+            self.last_tap.append((time(), time() - self.last_tap[-1][0]))
 
             # Clear if previous taps are too old
-            if time.time() - self.last_tap[-2][0] > 1:
+            if time() - self.last_tap[-2][0] > 1:
                 self.last_tap = [self.last_tap[-1]]
 
             else:
@@ -418,11 +465,11 @@ class Main_Frame(wx.Frame):
                 self.update_bpm_display(self.send_bpm, send_to="send")
 
         elif len(self.last_tap) == 1:
-            self.last_tap.append((time.time(), time.time() - self.last_tap[-1][0]))
+            self.last_tap.append((time(), time() - self.last_tap[-1][0]))
 
         else:
             # if no taps yet, add first tap
-            self.last_tap.append((time.time(), None))
+            self.last_tap.append((time(), None))
 
     def on_button_sync(self, event):
         self.switch_sync(self.button_sync.GetValue())
@@ -462,6 +509,7 @@ class Main_Frame(wx.Frame):
 
             # gui changes
             self.button_startstop.SetBackgroundColour((220, 150, 150))
+            self.audio_selection.Disable()
             for b in self.buttons_to_disable:
                 b.Enable()
 
@@ -479,6 +527,7 @@ class Main_Frame(wx.Frame):
             self.osc_client = None
 
             # gui changes
+            self.audio_selection.Enable()
             for b in self.buttons_to_disable:
                 b.Disable()
             self.button_startstop.SetBackgroundColour(wx.NullColour)
@@ -493,8 +542,8 @@ class Main_Frame(wx.Frame):
         # set gui status: connecting
         wx.SetCursor(wx.Cursor(wx.CURSOR_WAIT))
         self.button_ping.Disable()
-        self.text_connection.SetForegroundColour((255, 206, 13))
-        self.text_connection.SetLabel("Pinging...")
+        #self.text_connection.SetForegroundColour((255, 206, 13))
+        #self.text_connection.SetLabel("Pinging...")
         self.ip_stuff_sizer.Layout()
 
         # save input to config
@@ -529,14 +578,24 @@ class Main_Frame(wx.Frame):
         Args:
             state (bool): State to switch to
         """
+        #stop sync
         if not state and self.sync:
             self.bpm_thread_wait_and_terminate.clear()  # clearing thread terminating event
             self.sync = False
             self.button_sync.SetForegroundColour((220, 150, 150))
             # self.button_sync.SetLabel('❌')
+            
             self.button_sync.SetValue(False)
-            self.no_sync_send_thread = threading.Thread(target=self.send_thread_when_no_sync).start()
+            
+            #must be called first to get the beat_divider into the thread
+            self.no_sync_send_thread = Thread(target=self.send_thread_when_no_sync)
+            self.no_sync_send_thread.start()
+            
+            #self.button_halftime.SetValue(False)
+            self.button_halftime.Disable()
+            #self.on_button_halftime(None)
 
+        #start sync
         elif state and not self.sync:
             self.bpm_thread_wait_and_terminate.set()  # setting thread terminating event
             self.sync = False
@@ -544,7 +603,9 @@ class Main_Frame(wx.Frame):
             self.button_sync.SetForegroundColour((150, 220, 150))
             # self.button_sync.SetLabel('➜')
             self.button_sync.SetValue(True)
-
+            
+            self.button_halftime.SetValue(True if self.beat_divider == 2 else False)
+            self.button_halftime.Enable()
         else:
             print("Sync state already set to {}".format(state))
 
@@ -569,6 +630,9 @@ class Main_Frame(wx.Frame):
                 Args:
                     disp (self.live_disp | self.send_disp): display to update
                 """
+                # set new background color
+                new_bg = self.bg_a[::-1] if disp[0].GetColours()['background'] == self.bg_grey else self.bg_a
+                
                 for i, digit in enumerate(disp):
 
                     # set 0 in front if bpm has less than 3 digits
@@ -579,10 +643,8 @@ class Main_Frame(wx.Frame):
 
                     # blinking background
                     if Blink:
-                        if self.bpm_blink:
-                            digit.SetColours(background=self.bg_grey, segment_off=(220, 220, 220))
-                        else:
-                            digit.SetColours(background=(220, 220, 220), segment_off=self.bg_grey)
+                        digit.SetColours(background=new_bg[0], segment_off=new_bg[1])
+
 
             # send to display
             if send_to == "both":
@@ -595,7 +657,7 @@ class Main_Frame(wx.Frame):
 
             self.bpm_blink = not (self.bpm_blink)
 
-        threading.Thread(target=set_digits, args=(bpm, send_to)).start()
+        Thread(target=set_digits, args=(bpm, send_to)).start()
 
     def next_led(self, reset=False, thread=True):
 
@@ -623,7 +685,7 @@ class Main_Frame(wx.Frame):
                 set_background(self.leds[self.led_counter], (200, 0, 0))
 
         if thread:
-            threading.Thread(target=set_leds, args=(reset,)).start()
+            Thread(target=set_leds, args=(reset,)).start()
         else:
             set_leds(reset)
 
@@ -639,14 +701,24 @@ class Main_Frame(wx.Frame):
             elif beat_counter == 4:
                 comp = (time.time() - prev) - ((60/self.send_bpm)*8)
                 beat_counter = 0"""
+        # trigger at least once set_osc
+        prev_bpm = self.send_bpm
+        self.send_bpm//=self.beat_divider
+        #self.osc_client.send_osc(self.config['OSC']['BPM_ADRESS'], self.send_bpm, map_to_resolume=True)
+
+        # send bpm only on change
         while True:
-            prev = time.time()  # time compensation
-
+            prev_time = time()  # time compensation
             self.next_led(thread=False)
-            self.osc_client.send_osc("/composition/tempocontroller/tempo", self.send_bpm, map_to_resolume=True)
+            #self.osc_client.send_osc("/composition/tempocontroller/tempo", self.send_bpm, map_to_resolume=True)
 
-            # c based busy wating with return option(best)
-            if self.bpm_thread_wait_and_terminate.wait(60/self.send_bpm - (time.time()-prev)):
+            if prev_bpm != self.send_bpm:
+                self.osc_client.send_osc(self.config['OSC']['BPM_ADRESS'], self.send_bpm, map_to_resolume=True)
+                self.update_bpm_display(self.send_bpm, send_to="send", Blink=True) # send bpm to send display
+                prev_bpm = self.send_bpm
+                
+            # efficient c based busy wating with instant return option
+            if self.bpm_thread_wait_and_terminate.wait(60/self.send_bpm - (time()-prev_time)):
                 if self.resync:
                     continue
                 else:
@@ -656,7 +728,7 @@ class Main_Frame(wx.Frame):
         """Ask User if event can be vetoed (No force close event).
         """
         if self.running:
-            if wx.MessageBox("Do you really want to close Beatfinder?",
+            if wx.MessageBox("Do you really want to close BPMtoOSC?",
                              "Please confirm",
                              wx.ICON_QUESTION | wx.YES_NO) != wx.YES:
                 try:

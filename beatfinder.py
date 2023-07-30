@@ -1,14 +1,12 @@
-#
-#
-#
-#
-#
-import aubio
 import numpy as np
-import osc_client
 import pyaudio
-import threading
-import collections
+from collections import deque
+from aubio import tempo
+
+
+#local
+import osc_client
+
 
 
 class BeatPrinter:
@@ -34,11 +32,12 @@ class BeatDetector:
         # variables
         self.blink = 0  # blinking state flag
         self.bpm = 128
+        self.beat_counter = 0 # for live beat divider
         self.SAMPLERATE: int = 44100
         self.level_reset = None  # Timer for resetting level
-        self.level_queue = collections.deque(maxlen=20)  # RMS Level queue
+        self.level_queue = deque(maxlen=20)  # RMS Level queue
         self.p: pyaudio.PyAudio = pyaudio.PyAudio()
-        self.tempo = aubio.tempo("default", self.buf_size * 2, self.buf_size, self.SAMPLERATE)            
+        self.tempo = tempo("default", self.buf_size * 2, self.buf_size, self.SAMPLERATE)            
 
         # Callback to GUI
         if self.parent is not None:
@@ -93,6 +92,7 @@ class BeatDetector:
         # if beat is detected
         if beat[0]:
             
+            self.beat_counter += 1
             # extract bpm
             self.bpm = round(self.tempo.get_bpm())
 
@@ -100,18 +100,38 @@ class BeatDetector:
                 if self.parent.sync:
 
                     # SEND to osc and BOTH display if sync is on
+                    
                     self.parent.send_bpm = self.bpm
-                    self.client.send_osc(self.parent.config['OSC']['BPM_ADRESS'], self.bpm, map_to_resolume=True)
-                    self.parent.update_bpm_display(self.bpm, send_to="both", Blink=True)
-                    self.parent.next_led()
+                                        
+                    self.parent.update_bpm_display(self.bpm, send_to="live", Blink=True)
+                    
+                    if self.parent.beat_divider == 1:
+                        self.client.send_osc(self.parent.config['OSC']['BPM_ADRESS'], self.bpm, map_to_resolume=True)
+                        
+                        self.parent.update_bpm_display(self.bpm, send_to="send", Blink=True) # send bpm to send display
+                        
+                        self.parent.next_led()
 
+                    
+                    elif (self.beat_counter + 1) % self.parent.beat_divider == 0:
+                        self.client.send_osc(self.parent.config['OSC']['BPM_ADRESS'], self.bpm // self.parent.beat_divider, map_to_resolume=True)
+                        
+                        self.parent.update_bpm_display(self.bpm // self.parent.beat_divider, send_to="send", Blink=True) # send bpm to send display
+                        
+                        self.parent.next_led()
+
+                        
                     # BLINK resync button to beat when syncing (tap thread taking over when no sync)
                     #self.parent.button_resync.BackgroundColour = (220, 220, 220) if self.blink else self.parent.bg_grey
                     #self.blink = not self.blink
+                    
 
                 else:
                     # SEND only to LIVE display if sync is off
                     self.parent.update_bpm_display(self.bpm, send_to="live", Blink=False)
+                    
+            if self.beat_counter == 4:
+                self.beat_counter = 0
 
         # terminate stream if running is stopped
         return (None, pyaudio.paContinue) if self.parent.running else (None, pyaudio.paComplete)
