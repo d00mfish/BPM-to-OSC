@@ -14,4 +14,5 @@ If you want to change the OSC commands that are sent or any problems occur, edit
 
 
 In case you want to edit the code yourself, make sure to use Python 3.9.13 and the package-versions defined in the requirements.txt file.
+
 The beat detection itself was inspired and relies on the work from [DrLuke](https://github.com/DrLuke/aubio-beat-osc).
