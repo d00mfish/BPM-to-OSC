@@ -6,7 +6,7 @@ Since I was looking for something like this to avoid standing there the whole ni
 The app detects the beats per minute from an audio input and sending (custom) OSC commands to set the BPM-Counter inside Resolume (or any other LJ / VJ Software with OSC input).
 
 
-If you wnat to change the OSC commands that are sent or any problems occur, edit or delete the
+If you want to change the OSC commands that are sent or any problems occur, edit or delete the
 `%Appdata%\Roaming\BPMtoOSC\lastsession.ini` file.
 
 
