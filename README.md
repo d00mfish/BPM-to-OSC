@@ -9,7 +9,9 @@ The app detects the beats per minute from an audio input and sending (custom) OS
 If you wnat to change the OSC commands that are sent or any problems occur, edit or delete the
 `%Appdata%\Roaming\BPMtoOSC\lastsession.ini` file.
 
-<img src="[https://github.com/favicon.ico](https://user-images.githubusercontent.com/8715042/204784228-d0d6669f-5fe1-4689-aa9a-840369e1eebe.gif)" width="100">
+
+<a href="url"><img src="https://user-images.githubusercontent.com/8715042/204784228-d0d6669f-5fe1-4689-aa9a-840369e1eebe.gif" align="center" width="500" ></a>
+
 
 In case you want to edit the code yourself, make sure to use Python 3.9.13 and the package-versions defined in the requirements.txt file.
 The beat detection itself was inspired and relies on the work from [DrLuke](https://github.com/DrLuke/aubio-beat-osc).
